@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S ❤️ S | Master Owner Dashboard</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;padding:25px;
+ font-family:Segoe UI,Arial,sans-serif;
+ color:white;
+ background:linear-gradient(135deg,#090919,#25245b,#101024);
+ min-height:100vh;
+}
+.container{
+ max-width:1150px;margin:auto;
+ background:#17172bef;
+ border:1px solid #ffffff25;
+ border-radius:18px;padding:25px;
+ box-shadow:0 20px 50px #0009;
+}
+h1{text-align:center;color:#ff477e;margin-bottom:6px}
+.subtitle{text-align:center;color:#aeb8d0;letter-spacing:2px;font-size:12px}
+.card{
+ background:#ffffff09;border:1px solid #ffffff20;
+ padding:20px;border-radius:13px;margin-top:22px;
+}
+h3{color:#00e5ff;margin-top:0}
+label{display:block;margin:12px 0 6px;font-size:13px}
+input, select{
+ width:100%;padding:12px;background:#202039;
+ border:1px solid #555575;border-radius:7px;
+ color:white;margin-bottom:10px;
+}
+select option{background:#202039;color:white}
+button{
+ padding:10px 16px;border:0;border-radius:7px;
+ color:white;background:linear-gradient(120deg,#006aff,#00c6ff);
+ font-weight:bold;cursor:pointer;margin:4px 4px 4px 0;
+ font-size:13px;
+}
+button:hover{filter:brightness(1.2)}
+.danger{background:#d52c55}
+.secondary{background:#555575}
+.warning{background:#f39c12}
+.success{background:#27ae60}
+.key{
+ color:#39ff9c;background:#00e5ff15;
+ border:1px dashed #00e5ff;padding:15px;
+ border-radius:8px;word-break:break-all;font-size:18px;
+}
+.hidden{display:none!important}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:15px;min-width:800px}
+th,td{padding:12px;border-bottom:1px solid #ffffff20;text-align:left;font-size:13px}
+th{color:#00e5ff}
+a{color:#39ff9c;text-decoration:none;font-weight:bold;margin-left:10px}
+.status{color:#ffcf70;margin-top:12px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div class="container" id="loginPanel">
+<h1>S ❤️ S OWNER LOGIN</h1>
+<p class="subtitle">FAL • AUTO LOCATION • AUTO-PUBLISH PANEL</p>
+
+<label>Owner Password</label>
+<input type="password" id="loginPassword" placeholder="Enter password: SOS@2026" onkeydown="if(event.key==='Enter') unlockNow()">
+
+<button type="button" onclick="unlockNow()">UNLOCK DASHBOARD</button>
+<p id="loginMessage" class="status"></p>
+</div>
+
+<div class="container hidden" id="dashboard">
+<h1>S ❤️ S MASTER OWNER PANEL</h1>
+<p class="subtitle">LOCAL LICENSE & BLOCK MANAGEMENT (NO SERVER NEEDED)</p>
+
+<div class="card">
+<h3>🔑 Generate Activation Key</h3>
+
+<label>Select Target Extension</label>
+<select id="targetExt" onchange="updateExtUI()">
+<option value="FAL">Facebook Auto Listing (FAL)</option>
+<option value="LOC">S ❤️ S Auto Location Pro (LOC-PC-)</option>
+<option value="PUB">S ❤️ S FB Auto-Publish (PUB-PC-)</option>
+</select>
+
+<label>Client PC HWID</label>
+<input id="clientHwid" placeholder="e.g. FAL-334DCB8B0A">
+
+<label>Client Name / WhatsApp</label>
+<input id="clientName" placeholder="Client name or number">
+
+<label>Validity (Days)</label>
+<input type="number" id="validDays" value="7" min="1" max="365">
+
+<button type="button" onclick="generateNow()">GENERATE ACTIVATION KEY</button>
+
+<div id="resultBox" class="hidden">
+<p>Generated Activation Key:</p>
+<div class="key" id="displayKey"></div>
+<p id="expiryText"></p>
+<button type="button" onclick="copyNow()">COPY KEY</button>
+<a id="waLink" target="_blank" rel="noopener noreferrer">📲 SEND WHATSAPP</a>
+</div>
+</div>
+
+<div class="card">
+<h3>📊 License Records & Control Panel</h3>
+<button type="button" class="success" onclick="refreshNow()">🔄 REFRESH DATA</button>
+<div class="tablewrap">
+<table>
+<thead>
+<tr>
+<th>Extension</th>
+<th>Client</th>
+<th>HWID</th>
+<th>Key</th>
+<th>Status</th>
+<th>Expiry</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="records"></tbody>
+</table>
+</div>
+<button type="button" class="secondary" onclick="exportNow()">EXPORT CSV</button>
+</div>
+
+<div class="card">
+<h3>🛡️ Owner Security Settings</h3>
+<button type="button" class="secondary" onclick="lockNow()">LOCK DASHBOARD</button>
+</div>
+</div>
+
+<script>
+var DB_KEY = "sos_offline_licenses_v3";
+var memDb = {};
+var currentRecords = [];
+
+var EXT_CONFIG = {
+  FAL: { name: "Facebook Auto Listing (FAL)", prefix: "", placeholder: "e.g. FAL-334DCB8B0A" },
+  LOC: { name: "S ❤️ S Auto Location Pro", prefix: "LOC-PC-", placeholder: "e.g. LOC-PC-334DCB8B0A" },
+  PUB: { name: "S ❤️ S FB Auto-Publish", prefix: "PUB-PC-", placeholder: "e.g. PUB-PC-334DCB8B0A" }
+};
+
+function loadDb() {
+  try {
+    var raw = localStorage.getItem(DB_KEY);
+    if (raw) {
+      memDb = JSON.parse(raw);
+      return memDb;
+    }
+  } catch (e) {}
+  return memDb;
+}
+
+function saveDb(db) {
+  memDb = db;
+  try {
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+  } catch (e) {}
+}
+
+function updateExtUI() {
+  var ext = document.getElementById("targetExt").value;
+  var cfg = EXT_CONFIG[ext] || EXT_CONFIG.FAL;
+  document.getElementById("clientHwid").placeholder = cfg.placeholder;
+}
+
+function unlockNow() {
+  var pass = document.getElementById("loginPassword").value.trim();
+  var msg = document.getElementById("loginMessage");
+  if (pass === "SOS@2026") {
+    msg.textContent = "";
+    document.getElementById("loginPanel").style.display = "none";
+    var dash = document.getElementById("dashboard");
+    dash.classList.remove("hidden");
+    dash.style.display = "block";
+    updateExtUI();
+    refreshNow();
+  } else {
+    msg.textContent = "❌ Wrong password! Use SOS@2026";
+  }
+}
+
+function generateNow() {
+  var extType = document.getElementById("targetExt").value;
+  var cfg = EXT_CONFIG[extType] || EXT_CONFIG.FAL;
+  var hwid = document.getElementById("clientHwid").value.trim();
+  var name = document.getElementById("clientName").value.trim() || "Anonymous";
+  var days = Math.min(365, Math.max(1, parseInt(document.getElementById("validDays").value, 10) || 7));
+
+  if (!hwid) {
+    alert("Client HWID zaroor likhein!");
+    return;
+  }
+
+  var code = Math.floor(10000 + Math.random() * 90000);
+  var baseHwid = cfg.prefix && hwid.indexOf(cfg.prefix) !== 0 ? cfg.prefix + hwid : hwid;
+  var licenseKey = baseHwid + "-" + code;
+  var now = Date.now();
+  var expiresAt = now + days * 24 * 60 * 60 * 1000;
+
+  var db = loadDb();
+  db[licenseKey] = {
+    extType: extType,
+    extName: cfg.name,
+    name: name,
+    hwid: hwid,
+    expiresAt: expiresAt,
+    revoked: false,
+    createdAt: now
+  };
+  saveDb(db);
+
+  document.getElementById("displayKey").textContent = licenseKey;
+  document.getElementById("expiryText").textContent = "Expires: " + new Date(expiresAt).toLocaleString();
+  document.getElementById("resultBox").classList.remove("hidden");
+  var waText = "Hello " + name + ", your key for " + cfg.name + " is: " + licenseKey;
+  document.getElementById("waLink").href = "https://wa.me/?text=" + encodeURIComponent(waText);
+
+  refreshNow();
+  alert("✅ Key Ban Gayi!");
+}
+
+function refreshNow() {
+  var db = loadDb();
+  var tbody = document.getElementById("records");
+  tbody.innerHTML = "";
+  var keys = Object.keys(db);
+  currentRecords = keys.map(function(k) {
+    var item = Object.assign({}, db[k]);
+    item.key = k;
+    return item;
+  }).sort(function(a, b) {
+    return (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  if (currentRecords.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#aeb8d0;">No license records yet.</td></tr>';
+    return;
+  }
+
+  var now = Date.now();
+  currentRecords.forEach(function(r) {
+    var row = tbody.insertRow();
+    var status = r.revoked ? "Blocked" : (now > r.expiresAt ? "Expired" : "Active");
+
+    row.insertCell().textContent = r.extName || "Extension";
+    row.insertCell().textContent = r.name || "Anonymous";
+    row.insertCell().textContent = r.hwid;
+
+    var kCell = row.insertCell();
+    kCell.textContent = r.key;
+    kCell.style.color = "#39ff9c";
+
+    var sCell = row.insertCell();
+    sCell.textContent = status;
+    sCell.style.color = status === "Active" ? "#38ef7d" : "#ff3366";
+    sCell.style.fontWeight = "bold";
+
+    row.insertCell().textContent = new Date(r.expiresAt).toLocaleString();
+
+    var aCell = row.insertCell();
+    var b1 = document.createElement("button");
+    b1.type = "button";
+    b1.className = r.revoked ? "success" : "warning";
+    b1.textContent = r.revoked ? "Unblock" : "Block";
+    b1.onclick = function() {
+      var d = loadDb();
+      if (d[r.key]) { d[r.key].revoked = !d[r.key].revoked; saveDb(d); refreshNow(); }
+    };
+
+    var b2 = document.createElement("button");
+    b2.type = "button";
+    b2.className = "danger";
+    b2.textContent = "Delete";
+    b2.onclick = function() {
+      if (!confirm("Delete this record?")) return;
+      var d = loadDb();
+      delete d[r.key];
+      saveDb(d);
+      refreshNow();
+    };
+
+    aCell.appendChild(b1);
+    aCell.appendChild(b2);
+  });
+}
+
+function copyNow() {
+  var t = document.getElementById("displayKey").textContent;
+  if (!t) return;
+  navigator.clipboard.writeText(t).then(function() { alert("Key copied!"); }).catch(function() { prompt("Copy key:", t); });
+}
+
+function lockNow() {
+  document.getElementById("dashboard").style.display = "none";
+  document.getElementById("loginPanel").style.display = "block";
+  document.getElementById("loginPassword").value = "";
+}
+
+function exportNow() {
+  if (!currentRecords.length) { alert("No records to export!"); return; }
+  var csv = "Extension,Client,HWID,Key,Status,Expiry\n";
+  var now = Date.now();
+  currentRecords.forEach(function(r) {
+    var st = r.revoked ? "Blocked" : (now > r.expiresAt ? "Expired" : "Active");
+    csv += '"' + (r.extName||"") + '","' + (r.name||"") + '","' + r.hwid + '","' + r.key + '","' + st + '","' + new Date(r.expiresAt).toISOString() + '"\n';
+  });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "License-Records.csv";
+  a.click();
+}
+</script>
+</body>
+</html>
